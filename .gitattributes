@@ -1,0 +1,7 @@
+# Preserve fixture bytes, including intentional CRLF line endings.
+fixtures/**/input.rs -text whitespace=trailing-space,space-before-tab,cr-at-eol
+fixtures/**/expected.rs -text whitespace=trailing-space,space-before-tab,cr-at-eol
+# The unterminated macro input intentionally ends with a space.
+fixtures/errors/broken_macro/input.rs whitespace=-blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# The layout boundary case intentionally uses spaces before a tab.
+fixtures/**/use_layout_unicode_tabs/*.rs whitespace=trailing-space,-space-before-tab,cr-at-eol

@@ -1,0 +1,1 @@
+fn before() {} mod zebra; mod alpha; fn after() {}

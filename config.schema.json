@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "cargo-modfmt Configuration Schema",
+  "description": "Schema for modfmt.toml. All settings are optional; omitted settings use their defaults.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "files": {
+      "description": "File selection settings for check, write, and files.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "respect_gitignore": {
+          "description": "Respect .gitignore during directory traversal. Explicit files bypass this filter. Hidden paths and target directories are always skipped during traversal.",
+          "type": "boolean",
+          "default": true
+        },
+        "exclude": {
+          "description": "Gitignore-style exclusion patterns, relative to the configuration file's directory (or the working directory without a configuration file). Applies to explicit files as well as directory traversal. CLI --exclude patterns are added to this list.",
+          "type": "array",
+          "items": {
+            "description": "A single-line gitignore-style pattern. Re-inclusion with a leading unescaped ! is not supported. Glob syntax is validated by the application.",
+            "type": "string",
+            "allOf": [
+              { "not": { "pattern": "^!" } },
+              { "not": { "pattern": "[\r\n]" } }
+            ]
+          },
+          "default": [],
+          "examples": [["fixtures/**", "vendor/**"]]
+        }
+      }
+    },
+    "format": {
+      "description": "Source parsing and import sorting settings.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "edition": {
+          "description": "Rust parsing edition. CLI --edition overrides this setting. If omitted, use the source package edition, then rustfmt edition, then 2024.",
+          "type": "string",
+          "enum": ["2015", "2018", "2021", "2024"]
+        },
+        "style_edition": {
+          "description": "Rust style edition used to sort imports. CLI --style-edition overrides this setting. If omitted, use rustfmt style_edition, then the resolved parsing edition.",
+          "type": "string",
+          "enum": ["2015", "2018", "2021", "2024"]
+        }
+      }
+    }
+  }
+}

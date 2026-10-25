@@ -1,0 +1,10 @@
+use foo0::B;
+use std::path::Path;
+use foo::b::B;
+use core::fmt::Debug;
+use alloc::vec::Vec;
+use foo0::A;
+use alloc::string::String;
+use core::cmp::Ordering;
+use std::io::Read;
+use foo::a::A;
