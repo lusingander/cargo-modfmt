@@ -1,4 +1,7 @@
-use std::{fmt, path::PathBuf};
+use std::{
+    fmt,
+    path::{Path, PathBuf},
+};
 
 #[derive(Clone)]
 pub struct Resolved<T> {
@@ -14,7 +17,7 @@ impl<T> Resolved<T> {
     pub fn configured(
         value: Option<T>,
         default: T,
-        path: Option<&std::path::Path>,
+        path: Option<&Path>,
         key: &'static str,
     ) -> Self {
         match value {
@@ -41,7 +44,7 @@ pub enum Origin {
 }
 
 impl Origin {
-    pub fn file(path: &std::path::Path, key: &'static str) -> Self {
+    pub fn file(path: &Path, key: &'static str) -> Self {
         Self::File {
             path: path.to_owned(),
             key,

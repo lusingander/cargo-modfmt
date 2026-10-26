@@ -3,6 +3,7 @@ mod config;
 mod file;
 mod format;
 mod organize;
+mod report;
 mod settings;
 mod targets;
 
@@ -57,6 +58,8 @@ enum Command {
     Write(FileArgs),
     /// List selected files without reading their source.
     Files(FileArgs),
+    /// Explain resolved settings for one file or directory, without reading source.
+    Config(ConfigArgs),
     /// Read Rust source from stdin and write the result to stdout.
     Stdin,
 }
@@ -68,6 +71,17 @@ struct FileArgs {
     paths: Vec<PathBuf>,
 
     /// Exclude matching paths, relative to the configuration directory (or cwd).
+    #[arg(long, value_name = "PATTERN", value_parser = parse_exclude)]
+    exclude: Vec<String>,
+}
+
+#[derive(clap::Args)]
+struct ConfigArgs {
+    /// File to inspect, or lookup directory (defaults to cwd, like stdin; no recursion).
+    #[arg(value_name = "PATH")]
+    path: Option<PathBuf>,
+
+    /// Add an exclusion pattern to the report; file selection is not evaluated.
     #[arg(long, value_name = "PATTERN", value_parser = parse_exclude)]
     exclude: Vec<String>,
 }
@@ -89,6 +103,7 @@ fn run(args: Args) -> Result<ExitCode, Box<dyn Error>> {
         Command::Check(inputs) | Command::Write(inputs) | Command::Files(inputs) => {
             inputs.exclude.as_slice()
         }
+        Command::Config(inputs) => inputs.exclude.as_slice(),
         Command::Stdin => &[],
     };
     let config = Config::load(
@@ -109,6 +124,10 @@ fn run(args: Args) -> Result<ExitCode, Box<dyn Error>> {
         Command::Check(inputs) => (Mode::Check, inputs),
         Command::Write(inputs) => (Mode::Write, inputs),
         Command::Files(inputs) => (Mode::Files, inputs),
+        Command::Config(inputs) => {
+            report::run(&cwd, inputs.path.as_deref(), &config, &mut formats)?;
+            return Ok(ExitCode::SUCCESS);
+        }
         Command::Stdin => {
             format_stdin(formats.for_directory(&cwd)?.options())?;
             return Ok(ExitCode::SUCCESS);

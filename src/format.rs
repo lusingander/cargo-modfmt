@@ -175,7 +175,9 @@ impl FormatResolver {
             .clone()
             .or(cargo_edition)
             .or(rustfmt_edition)
-            .unwrap_or_else(|| Resolved::new(SourceEdition::E2024, Origin::Default(None)));
+            .unwrap_or_else(|| {
+                Resolved::new(SourceEdition::E2024, Origin::Default(rustfmt.path.clone()))
+            });
         let style_edition = self
             .overrides
             .style_edition

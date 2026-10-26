@@ -72,6 +72,25 @@ fn stdin_matches_expected_and_is_idempotent() {
     assert_eq!(repeated.stdout, output.stdout);
 }
 
+#[test]
+fn config_command_reports_settings_through_cargo_without_reading_source() {
+    let project = Project::new();
+    fs::write(project.cwd.join("modfmt"), [0xff]).unwrap();
+    fs::write(project.cwd.join("rustfmt.toml"), "max_width = 80").unwrap();
+    let output = project.execute(
+        &["modfmt", "config", "modfmt", "--edition", "2021"],
+        b"\xff",
+    );
+    assert_success(&output);
+    let report = String::from_utf8(output.stdout).unwrap();
+    assert!(
+        report.contains("edition: 2021\n  command line --edition\n"),
+        "{report}"
+    );
+    assert!(report.contains("max_width: 80\n"), "{report}");
+    assert_eq!(fs::read(project.cwd.join("modfmt")).unwrap(), [0xff]);
+}
+
 #[rustfmt::skip]
 #[rstest]
 #[case::automatic(&["modfmt", "stdin"], "legacy.rs")]
@@ -127,6 +146,7 @@ fn file_workflow_preserves_paths(#[case] name: &str) {
 #[rstest]
 #[case::root_help(&["modfmt", "--config", "missing.toml", "--help"], 0, "")]
 #[case::subcommand_help(&["modfmt", "check", "--help"], 0, " check")]
+#[case::config_help(&["modfmt", "config", "--help"], 0, " config")]
 #[case::help_command(&["modfmt", "help", "check"], 0, " check")]
 #[case::cargo_help(&["help", "modfmt"], 0, "")]
 #[case::missing_mode(&["modfmt"], 2, "")]
