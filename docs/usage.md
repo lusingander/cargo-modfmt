@@ -26,9 +26,9 @@ cargo modfmt stdin < src/main.rs > /tmp/main-organized.rs
 
 ## Using rustfmt
 
-Use stable rustfmt with matching style editions and otherwise default formatting settings. See the [compatibility target](rustfmt-compatibility.md#compatibility-target) for supported settings and limitations.
+Use stable rustfmt with matching style editions. Custom `max_width`, `tab_spaces`, and `hard_tabs` settings are supported; keep other formatting settings at their defaults for the compatibility target. See the [compatibility target](rustfmt-compatibility.md#compatibility-target) for supported settings and limitations.
 
-The tool automatically reads edition settings from Cargo and rustfmt configuration. To use 2024 sorting with an older parsing edition, make the style explicit in `rustfmt.toml`:
+The tool automatically reads edition settings from Cargo and rustfmt configuration, and import width and continuation indentation from rustfmt configuration. To use 2024 sorting with an older parsing edition, make the style explicit in `rustfmt.toml`:
 
 ```toml
 style_edition = "2024"
@@ -95,7 +95,7 @@ File commands print one line per reported path, ending with LF. Paths are double
 
 Source must be valid UTF-8 and parse successfully. A failed file is not partially rewritten.
 
-Edition settings for all selected files are resolved before any processing or listing. A configuration error leaves all sources unchanged. After an individual source fails during processing, other selected files are still processed. Successful writes are retained even if the command eventually exits with an error.
+Edition and layout settings for all selected files are resolved before any processing or listing. A configuration error leaves all sources unchanged. After an individual source fails during processing, other selected files are still processed. Successful writes are retained even if the command eventually exits with an error.
 
 Read-only sources are protected. Avoid concurrent editing. Ownership, ACLs, extended attributes, and hard-link relationships are not guaranteed to survive an update.
 

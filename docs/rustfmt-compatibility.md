@@ -6,9 +6,9 @@ This guide separates [deliberate differences](#deliberate-differences) from [cur
 
 ## Compatibility target
 
-The compatibility target is **stable rustfmt with matching style editions (2015, 2018, 2021, or 2024), and otherwise default formatting settings**. Nightly compatibility and identical output across rustfmt versions are not promised. See [comparison versions and verification](#comparison-versions-and-verification) for the versions used in this guide.
+The compatibility target is **stable rustfmt with matching style editions (2015, 2018, 2021, or 2024), shared `max_width`, `tab_spaces`, and `hard_tabs` settings, and defaults for other formatting settings**. Nightly compatibility and identical output across rustfmt versions are not promised. See [comparison versions and verification](#comparison-versions-and-verification) for the versions used in this guide.
 
-See [corresponding rustfmt settings](#formatting-settings-beyond-editions-are-fixed) for the closest options and how custom settings can affect this workflow.
+See [corresponding rustfmt settings](#supported-and-fixed-formatting-settings) for the closest options and how custom settings can affect this workflow.
 
 Within each group, ordinary import sorting follows the selected style edition. In 2024, `alpha2` precedes `alpha10`; in 2015–2021, identifiers use the older snake_case → CamelCase → UPPER_SNAKE_CASE categories and lexical comparison, so `alpha10` comes first. Local roots follow `self`, `super`, then `crate` in both styles. See the [official version sorting guide](https://doc.rust-lang.org/edition-guide/rust-2024/rustfmt-version-sorting.html). Singleton braces, redundant ordinary aliases, and visibility spelling are also normalized. These are shared behaviors; the extra arrangement rules and coverage gaps are described below. Nightly is not required to run the tool.
 
@@ -341,13 +341,13 @@ The reference stable rustfmt removes one, so this tool's unchanged output fails 
 
 A file missing its final newline can also pass this tool's check while failing stable fmt check. Preserving a BOM or CRLF alone did not fail the reference rustfmt's real-file check; that should not be confused with its output when reading from standard input.
 
-### Formatting settings beyond editions are fixed
+### Supported and fixed formatting settings
 
-Only edition settings are read from Cargo and rustfmt configuration. See [Configuration](configuration.md#editions-and-automatic-lookup) for lookup rules, overrides, and defaults.
+Edition settings are read from Cargo and rustfmt configuration. Import layout also reads rustfmt's `max_width`, `tab_spaces`, and `hard_tabs`. See [Configuration](configuration.md#editions-and-automatic-lookup) for lookup rules and edition overrides, and [import width and indentation](configuration.md#import-width-and-indentation) for layout defaults and validation.
 
-Custom group order, alias order, merging policy, width, indentation, and import layout are not configurable. Selecting a style edition changes import sorting, not general Rust formatting or all of rustfmt's edition-dependent behavior. A long indivisible path can exceed 100 columns; the width is a layout target.
+Custom group order, alias order, merging policy, import layout strategy, and import indentation strategy are not configurable. Selecting a style edition changes import sorting, not general Rust formatting or all of rustfmt's edition-dependent behavior. A long indivisible path can exceed the configured width; the width is a layout target.
 
-The following rustfmt settings are the closest counterparts for the [reference versions](#comparison-versions-and-verification). Grouping and merging still have the deliberate differences described earlier. These are rustfmt options; only the edition settings configure this tool through rustfmt configuration.
+The following rustfmt settings are the closest counterparts for the [reference versions](#comparison-versions-and-verification). Grouping and merging still have the deliberate differences described earlier. These are rustfmt options; the editions and the width and indentation settings configure this tool through rustfmt configuration.
 
 | Behavior | Related rustfmt setting | Configurable on | This tool |
 | --- | --- | --- | --- |
@@ -355,14 +355,14 @@ The following rustfmt settings are the closest counterparts for the [reference v
 | Module sorting | [`reorder_modules = true`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#reorder_modules) | Stable | Always sorts eligible modules and separates them by visibility. |
 | Import grouping | [`group_imports = "StdExternalCrate"`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#group_imports) | Nightly | Uses three import groups plus two module groups. |
 | Import merging | [`imports_granularity = "Crate"`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#imports_granularity) | Nightly | Merges compatible declarations conservatively and preserves duplicates. |
-| Width | [`max_width = 100`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#max_width) | Stable | Uses a fixed width target of 100. |
-| Indentation | [`tab_spaces = 4`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#tab_spaces), [`hard_tabs = false`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#hard_tabs) | Stable | Preserves the section's base indentation and adds four spaces per continuation level. |
+| Width | [`max_width = 100`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#max_width) | Stable | Reads the configured width target; defaults to 100. |
+| Indentation | [`tab_spaces = 4`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#tab_spaces), [`hard_tabs = false`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#hard_tabs) | Stable | Preserves the section's base indentation; continuation lines and tab width follow these settings. |
 | Import layout | [`imports_layout = "Mixed"`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#imports_layout) | Nightly | Can place several siblings on one continuation line. |
 | Import indentation | [`imports_indent = "Block"`](https://github.com/rust-lang/rustfmt/blob/main/Configurations.md#imports_indent) | Nightly | Indents continuation lines relative to the enclosing group. |
 
 “Nightly” means the option requires nightly to configure explicitly; stable rustfmt still uses its built-in defaults, including Mixed layout and Block import indentation. The nightly comparison changes only `imports_granularity` and `group_imports` from their defaults. Matching those two values does not make nightly output identical to this tool's output.
 
-Settings that change declaration layout or import structure can produce competing changes. For example, `max_width = 80` or nightly's `imports_layout = "Vertical"` can make rustfmt wrap imports differently, while this tool continues to use width 100 and Mixed layout. Alternating the tools may then keep changing the same source. Nightly's `imports_granularity = "Module"`, `"Item"`, or `"One"` can also change the structure that this tool produces or supports.
+Unsupported settings that change declaration layout or import structure can produce competing changes. For example, nightly's `imports_layout = "Vertical"` can make rustfmt wrap imports differently, while this tool continues to use Mixed layout. Alternating the tools may then keep changing the same source. Width and indentation settings must resolve to the same values in both tools; this tool retains its documented lookup boundaries and does not read rustfmt's home or global fallback configuration. Nightly's `imports_granularity = "Module"`, `"Item"`, or `"One"` can also change the structure that this tool produces or supports.
 
 Disabling `reorder_imports` or `reorder_modules` in rustfmt does not disable sorting in this tool; rustfmt simply leaves that resulting order in place. These switches do not by themselves imply a conflict. Check both tools with your actual configuration; convergence outside the compatibility target is not guaranteed.
 
@@ -376,5 +376,7 @@ The comparisons in this guide were checked on 2026-10-24 with:
 | Nightly | `rustfmt 1.11.0-nightly (19833af722 2026-10-20)` | Same settings, plus `imports_granularity = "Crate"` and `group_imports = "StdExternalCrate"` |
 
 On 2026-10-25, stable checks and alternating-tool byte equality were also verified for all four supported style editions. Nightly examples still refer to the original 2024 settings.
+
+On 2026-10-26, stable checks and alternating-tool byte equality were additionally verified for widths 80, 100, and 120, two-space indentation, and hard tabs with tab widths 2 and 4. These checks cover all four style editions, LF and CRLF, nested imports, merged imports, and Unicode identifiers using the stable version above.
 
 Compatibility fixtures use parsing edition 2024; compile/run fixtures also cover older parsing editions.
