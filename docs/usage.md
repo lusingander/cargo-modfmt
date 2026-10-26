@@ -11,9 +11,10 @@ cargo modfmt <COMMAND> [OPTIONS]
 | `write <PATH>...` | Update files in place; report updated paths to stderr. |
 | `check <PATH>...` | Report paths needing changes to stdout without modifying files. |
 | `files <PATH>...` | List selected paths without reading their source. |
+| `config [PATH]` | Explain resolved settings and their sources for one file or lookup directory. Defaults to the working directory; does not read source or recurse. |
 | `stdin` | Read UTF-8 Rust source from stdin and write the organized source to stdout. |
 
-File commands require one or more files or directories. Directories are searched recursively for `.rs` files; Cargo workspaces and external module declarations are not used to discover files.
+The `write`, `check`, and `files` commands require one or more files or directories. Directories are searched recursively for `.rs` files; Cargo workspaces and external module declarations are not used to discover files.
 
 See [file selection](configuration.md#file-selection) for traversal filters, `.gitignore` scope, and explicit-path rules, including symlink handling.
 
@@ -21,8 +22,11 @@ See [file selection](configuration.md#file-selection) for traversal filters, `.g
 cargo modfmt write src tests
 cargo modfmt check src/main.rs src/lib.rs
 cargo modfmt files . --exclude 'vendor/**'
+cargo modfmt config src/main.rs
 cargo modfmt stdin < src/main.rs > /tmp/main-organized.rs
 ```
+
+Use `config` to inspect effective values, their origins, and configuration lookup results without formatting. A directory is a lookup starting point, not a request to inspect every source below it. See [inspecting resolved settings](configuration.md#inspecting-resolved-settings) for examples, reported settings, and scope.
 
 ## Using rustfmt
 
@@ -64,7 +68,7 @@ For supported input under the target settings, both checks should pass after the
 | `--config <FILE>` | Use an explicit configuration file instead of searching for `modfmt.toml`. |
 | `--edition <EDITION>` | Override the parsing edition; also supplies the style fallback when no style edition is configured. |
 | `--style-edition <EDITION>` | Override the edition used to sort imports, independently of parsing. |
-| `--exclude <PATTERN>` | Add an exclusion pattern. Repeatable; available for file commands. |
+| `--exclude <PATTERN>` | Add an exclusion pattern. Repeatable; available for `write`, `check`, `files`, and `config`. In `config`, patterns are reported without filtering the inspection target. |
 
 For accepted editions and configuration defaults, see [config.schema.json](../config.schema.json). Unspecified editions are resolved from Cargo and rustfmt settings for each source file. Configuration lookup, precedence, and exclusion rules are described in [Configuration](configuration.md).
 
@@ -82,6 +86,8 @@ File commands print one line per reported path, ending with LF. Paths are double
 
 `files` lists all selected paths. `check` reports only files needing changes, and `write` reports only successfully updated files; neither reports unchanged files. The `stdin` command writes the Rust source itself to stdout, without quoting it as a path.
 
+`config` writes a human-readable diagnostic report to stdout. Its target and format lookup directory are canonical absolute paths. Configuration paths are absolute but can retain symlinks or `..` components. All paths and exclusion patterns are quoted and escaped. The report is not a machine-readable interface or an exportable `modfmt.toml`.
+
 ## Exit codes
 
 | Code | Meaning |
@@ -93,7 +99,7 @@ File commands print one line per reported path, ending with LF. Paths are double
 
 ## File updates and failures
 
-Source must be valid UTF-8 and parse successfully. A failed file is not partially rewritten.
+For formatting commands, source must be valid UTF-8 and parse successfully. A failed file is not partially rewritten. `config` does not open source files or read stdin.
 
 Edition and layout settings for all selected files are resolved before any processing or listing. A configuration error leaves all sources unchanged. After an individual source fails during processing, other selected files are still processed. Successful writes are retained even if the command eventually exits with an error.
 

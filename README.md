@@ -91,6 +91,8 @@ Parsing and style editions are inferred from each source file’s Cargo and rust
 
 Place project settings in `modfmt.toml`. See [Configuration](docs/configuration.md) for examples and the [configuration schema](config.schema.json) for all `modfmt.toml` settings and defaults.
 
+Use `cargo modfmt config src/main.rs` to inspect the resolved settings and their sources for a file. With no path, `config` uses the working directory, like `stdin`. See [inspecting settings](docs/configuration.md#inspecting-resolved-settings) for details.
+
 ## License
 
 [MIT](LICENSE)
