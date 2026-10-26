@@ -7,8 +7,8 @@ use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use serde::{Deserialize, de::DeserializeOwned};
 
 use crate::{
-    editions::EditionOverrides,
     file::FileError,
+    format::EditionOverrides,
     organize::{SourceEdition, StyleEdition},
 };
 

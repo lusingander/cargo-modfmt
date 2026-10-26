@@ -1,7 +1,7 @@
 mod batch;
 mod config;
-mod editions;
 mod file;
+mod format;
 mod organize;
 mod targets;
 
@@ -17,7 +17,7 @@ use clap::{Parser, Subcommand};
 use crate::{
     batch::{Input, Mode},
     config::{Config, parse_exclude},
-    editions::{EditionOverrides, FormatResolver},
+    format::{EditionOverrides, FormatResolver},
     organize::{FormatOptions, SourceEdition, StyleEdition, organize},
 };
 
