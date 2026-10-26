@@ -11,17 +11,42 @@ use crate::{
     config::{exists, find_ancestor_file, read_document},
     file::FileError,
     organize::{FormatOptions, LayoutOptions, SourceEdition, StyleEdition},
+    settings::{FileSearch, Origin, Resolved},
 };
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct EditionOverrides {
-    pub edition: Option<SourceEdition>,
-    pub style_edition: Option<StyleEdition>,
+    pub edition: Option<Resolved<SourceEdition>>,
+    pub style_edition: Option<Resolved<StyleEdition>>,
 }
 
 pub struct FormatResolver {
     overrides: EditionOverrides,
-    directories: HashMap<PathBuf, FormatOptions>,
+    directories: HashMap<PathBuf, ResolvedFormat>,
+}
+
+pub struct ResolvedFormat {
+    pub edition: Resolved<SourceEdition>,
+    pub style_edition: Resolved<StyleEdition>,
+    pub max_width: Resolved<usize>,
+    pub tab_spaces: Resolved<usize>,
+    pub hard_tabs: Resolved<bool>,
+    pub cargo: Option<FileSearch>,
+    pub rustfmt: FileSearch,
+}
+
+impl ResolvedFormat {
+    pub fn options(&self) -> FormatOptions {
+        FormatOptions {
+            edition: self.edition.value,
+            style_edition: self.style_edition.value,
+            layout: LayoutOptions {
+                max_width: self.max_width.value,
+                tab_spaces: self.tab_spaces.value,
+                hard_tabs: self.hard_tabs.value,
+            },
+        }
+    }
 }
 
 #[derive(Default, Deserialize)]
@@ -76,90 +101,111 @@ impl FormatResolver {
         }
     }
 
-    pub fn for_file(&mut self, path: &Path) -> Result<FormatOptions, FileError> {
+    pub fn for_file(&mut self, path: &Path) -> Result<&ResolvedFormat, FileError> {
         let canonical = fs::canonicalize(path).map_err(|error| {
             FileError::new(path, "resolve source path for format settings in", error)
         })?;
         self.for_directory(canonical.parent().unwrap())
     }
 
-    pub fn for_directory(&mut self, directory: &Path) -> Result<FormatOptions, FileError> {
+    pub fn for_directory(&mut self, directory: &Path) -> Result<&ResolvedFormat, FileError> {
         let directory = fs::canonicalize(directory).map_err(|error| {
             FileError::new(directory, "resolve format settings directory", error)
         })?;
-        if let Some(options) = self.directories.get(&directory) {
-            return Ok(*options);
+        if !self.directories.contains_key(&directory) {
+            let resolved = self.resolve_directory(&directory)?;
+            self.directories.insert(directory.clone(), resolved);
         }
+        Ok(self.directories.get(&directory).unwrap())
+    }
+
+    fn resolve_directory(&self, directory: &Path) -> Result<ResolvedFormat, FileError> {
         let cargo = if self.overrides.edition.is_none() {
-            match find_ancestor_file(&directory, &["Cargo.toml"])? {
-                Some(path) => cargo_edition(&path)?,
-                None => None,
-            }
+            Some(find_ancestor_file(directory, &["Cargo.toml"])?)
         } else {
             None
         };
+        let cargo_edition = match cargo.as_ref().and_then(|search| search.path.as_deref()) {
+            Some(path) => cargo_edition(path)?,
+            None => None,
+        };
+        let needs_editions = self.overrides.style_edition.is_none()
+            || (self.overrides.edition.is_none() && cargo_edition.is_none());
+        let rustfmt = find_ancestor_file(directory, &[".rustfmt.toml", "rustfmt.toml"])?;
+        let path = rustfmt.path.as_deref();
+        let document: RustfmtDocument = match path {
+            Some(path) => read_document(path)?,
+            None => RustfmtDocument::default(),
+        };
+        let defaults = LayoutOptions::default();
+        let max_width =
+            Resolved::configured(document.max_width, defaults.max_width, path, "max_width");
+        let tab_spaces =
+            Resolved::configured(document.tab_spaces, defaults.tab_spaces, path, "tab_spaces");
+        let hard_tabs =
+            Resolved::configured(document.hard_tabs, defaults.hard_tabs, path, "hard_tabs");
+        if hard_tabs.value && tab_spaces.value == 0 {
+            return Err(FileError::new(
+                path.unwrap(),
+                "validate format settings in",
+                io::Error::other("tab_spaces must be greater than zero when hard_tabs is true"),
+            ));
+        }
         let mut rustfmt_edition = None;
         let mut rustfmt_style = None;
-        let mut layout = LayoutOptions::default();
-        let needs_editions = self.overrides.style_edition.is_none()
-            || (self.overrides.edition.is_none() && cargo.is_none());
-        if let Some(path) = find_ancestor_file(&directory, &[".rustfmt.toml", "rustfmt.toml"])? {
-            let document: RustfmtDocument = read_document(&path)?;
-            layout = LayoutOptions {
-                max_width: document.max_width.unwrap_or(layout.max_width),
-                tab_spaces: document.tab_spaces.unwrap_or(layout.tab_spaces),
-                hard_tabs: document.hard_tabs.unwrap_or(layout.hard_tabs),
-            };
-            if layout.hard_tabs && layout.tab_spaces == 0 {
-                return Err(FileError::new(
-                    &path,
-                    "validate format settings in",
-                    io::Error::other("tab_spaces must be greater than zero when hard_tabs is true"),
+        if needs_editions {
+            if let Some(value) = document.edition {
+                let path = path.unwrap();
+                rustfmt_edition = Some(Resolved::new(
+                    parse_setting(path, "edition", &value)?,
+                    Origin::file(path, "edition"),
                 ));
             }
-            if needs_editions {
-                rustfmt_edition = document
-                    .edition
-                    .as_deref()
-                    .map(|value| parse_setting(&path, "edition", value))
-                    .transpose()?;
-                rustfmt_style = document
-                    .style_edition
-                    .as_deref()
-                    .map(|value| parse_setting(&path, "style_edition", value))
-                    .transpose()?;
+            if let Some(value) = document.style_edition {
+                let path = path.unwrap();
+                rustfmt_style = Some(Resolved::new(
+                    parse_setting(path, "style_edition", &value)?,
+                    Origin::file(path, "style_edition"),
+                ));
             }
         }
         let edition = self
             .overrides
             .edition
-            .or(cargo)
+            .clone()
+            .or(cargo_edition)
             .or(rustfmt_edition)
-            .unwrap_or(SourceEdition::E2024);
-        let options = FormatOptions {
+            .unwrap_or_else(|| Resolved::new(SourceEdition::E2024, Origin::Default(None)));
+        let style_edition = self
+            .overrides
+            .style_edition
+            .clone()
+            .or(rustfmt_style)
+            .unwrap_or_else(|| Resolved::new(edition.value.into(), Origin::ParsingEdition));
+        Ok(ResolvedFormat {
             edition,
-            style_edition: self
-                .overrides
-                .style_edition
-                .or(rustfmt_style)
-                .unwrap_or_else(|| edition.into()),
-            layout,
-        };
-        self.directories.insert(directory, options);
-        Ok(options)
+            style_edition,
+            max_width,
+            tab_spaces,
+            hard_tabs,
+            cargo,
+            rustfmt,
+        })
     }
 }
 
-fn cargo_edition(path: &Path) -> Result<Option<SourceEdition>, FileError> {
+fn cargo_edition(path: &Path) -> Result<Option<Resolved<SourceEdition>>, FileError> {
     let document: CargoDocument = read_document(path)?;
     let Some(package) = document.package else {
         return Ok(None);
     };
     match package.edition {
-        Some(PackageEdition::Value(value)) => {
-            parse_setting(path, "package.edition", &value).map(Some)
-        }
-        None => Ok(Some(SourceEdition::E2015)),
+        Some(PackageEdition::Value(value)) => parse_setting(path, "package.edition", &value)
+            .map(|value| Some(Resolved::new(value, Origin::file(path, "package.edition")))),
+        None => Ok(Some(Resolved::new(
+            SourceEdition::E2015,
+            Origin::CargoDefault(path.to_owned()),
+        ))),
         Some(PackageEdition::Inherited(inheritance)) => {
             if !inheritance.workspace {
                 return Err(edition_error(
@@ -169,15 +215,15 @@ fn cargo_edition(path: &Path) -> Result<Option<SourceEdition>, FileError> {
             }
             let directory = path.parent().unwrap();
             if let Some(workspace) = package.workspace {
-                let path = directory.join(workspace).join("Cargo.toml");
-                let document: CargoDocument = read_document(&path)?;
-                let workspace = document
-                    .workspace
-                    .ok_or_else(|| edition_error(&path, "expected a workspace manifest"))?;
-                return inherited_edition(&path, workspace).map(Some);
+                let workspace_path = directory.join(workspace).join("Cargo.toml");
+                let document: CargoDocument = read_document(&workspace_path)?;
+                let workspace = document.workspace.ok_or_else(|| {
+                    edition_error(&workspace_path, "expected a workspace manifest")
+                })?;
+                return inherited_edition(&workspace_path, workspace, path).map(Some);
             }
             if let Some(workspace) = document.workspace {
-                return inherited_edition(path, workspace).map(Some);
+                return inherited_edition(path, workspace, path).map(Some);
             }
             if !exists(&directory.join(".git"))? {
                 for parent in directory.ancestors().skip(1) {
@@ -185,7 +231,7 @@ fn cargo_edition(path: &Path) -> Result<Option<SourceEdition>, FileError> {
                     if exists(&manifest)? {
                         let document: CargoDocument = read_document(&manifest)?;
                         if let Some(workspace) = document.workspace {
-                            return inherited_edition(&manifest, workspace).map(Some);
+                            return inherited_edition(&manifest, workspace, path).map(Some);
                         }
                     }
                     if exists(&parent.join(".git"))? {
@@ -201,12 +247,23 @@ fn cargo_edition(path: &Path) -> Result<Option<SourceEdition>, FileError> {
     }
 }
 
-fn inherited_edition(path: &Path, workspace: Workspace) -> Result<SourceEdition, FileError> {
+fn inherited_edition(
+    path: &Path,
+    workspace: Workspace,
+    package: &Path,
+) -> Result<Resolved<SourceEdition>, FileError> {
     let value = workspace
         .package
         .and_then(|package| package.edition)
         .ok_or_else(|| edition_error(path, "workspace.package.edition is missing"))?;
-    parse_setting(path, "workspace.package.edition", &value)
+    let value = parse_setting(path, "workspace.package.edition", &value)?;
+    Ok(Resolved::new(
+        value,
+        Origin::Workspace {
+            package: package.to_owned(),
+            workspace: path.to_owned(),
+        },
+    ))
 }
 
 fn edition_error(path: &Path, message: &str) -> FileError {

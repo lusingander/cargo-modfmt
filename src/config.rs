@@ -10,11 +10,16 @@ use crate::{
     file::FileError,
     format::EditionOverrides,
     organize::{SourceEdition, StyleEdition},
+    settings::{FileSearch, Origin, Resolved, SearchStop},
 };
 
 pub struct Config {
+    pub path: Option<PathBuf>,
+    pub search: Option<FileSearch>,
     pub editions: EditionOverrides,
-    pub respect_gitignore: bool,
+    pub respect_gitignore: Resolved<bool>,
+    pub exclude: Resolved<Vec<String>>,
+    pub additional_exclude: Vec<String>,
     pub exclusions: Exclusions,
 }
 
@@ -25,20 +30,11 @@ struct Document {
     format: Format,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 struct Files {
-    respect_gitignore: bool,
-    exclude: Vec<String>,
-}
-
-impl Default for Files {
-    fn default() -> Self {
-        Self {
-            respect_gitignore: true,
-            exclude: Vec::new(),
-        }
-    }
+    respect_gitignore: Option<bool>,
+    exclude: Option<Vec<String>>,
 }
 
 #[derive(Default, Deserialize)]
@@ -55,9 +51,13 @@ impl Config {
         overrides: EditionOverrides,
         exclude: &[String],
     ) -> Result<Self, FileError> {
+        let search = match explicit {
+            Some(_) => None,
+            None => Some(find_ancestor_file(cwd, &["modfmt.toml"])?),
+        };
         let path = match explicit {
-            Some(path) => Some(path.to_owned()),
-            None => find_ancestor_file(cwd, &["modfmt.toml"])?,
+            Some(path) => Some(cwd.join(path)),
+            None => search.as_ref().unwrap().path.clone(),
         };
         let document = match &path {
             Some(path) => read_document(path)?,
@@ -99,34 +99,79 @@ impl Config {
         };
         let base = fs::canonicalize(base)
             .map_err(|error| FileError::new(base, "resolve configuration directory", error))?;
-        let patterns = document.files.exclude.iter().chain(exclude).cloned();
+        let respect_gitignore = Resolved::configured(
+            document.files.respect_gitignore,
+            true,
+            path.as_deref(),
+            "files.respect_gitignore",
+        );
+        let configured_exclude = Resolved::configured(
+            document.files.exclude,
+            Vec::new(),
+            path.as_deref(),
+            "files.exclude",
+        );
+        let patterns = configured_exclude.value.iter().chain(exclude).cloned();
         let exclusions = Exclusions::new(base, patterns).map_err(|error| {
             FileError::new(context, "validate exclusions in", io::Error::other(error))
         })?;
         Ok(Self {
             editions: EditionOverrides {
-                edition: overrides.edition.or(configured_edition),
-                style_edition: overrides.style_edition.or(configured_style),
+                edition: overrides.edition.or_else(|| {
+                    configured_edition.map(|value| {
+                        Resolved::new(
+                            value,
+                            Origin::file(path.as_ref().unwrap(), "format.edition"),
+                        )
+                    })
+                }),
+                style_edition: overrides.style_edition.or_else(|| {
+                    configured_style.map(|value| {
+                        Resolved::new(
+                            value,
+                            Origin::file(path.as_ref().unwrap(), "format.style_edition"),
+                        )
+                    })
+                }),
             },
-            respect_gitignore: document.files.respect_gitignore,
+            path,
+            search,
+            respect_gitignore,
+            exclude: configured_exclude,
+            additional_exclude: exclude.to_vec(),
             exclusions,
         })
     }
 }
 
-pub fn find_ancestor_file(directory: &Path, names: &[&str]) -> Result<Option<PathBuf>, FileError> {
-    for directory in directory.ancestors() {
+pub fn find_ancestor_file(start: &Path, names: &[&str]) -> Result<FileSearch, FileError> {
+    for directory in start.ancestors() {
         for name in names {
             let path = directory.join(name);
             if exists(&path)? {
-                return Ok(Some(path));
+                return Ok(FileSearch {
+                    path: Some(path),
+                    start: start.to_owned(),
+                    stopped_at: directory.to_owned(),
+                    reason: SearchStop::Found,
+                });
             }
         }
-        if exists(&directory.join(".git"))? {
-            break;
+        let repository_root = exists(&directory.join(".git"))?;
+        if repository_root || directory.parent().is_none() {
+            return Ok(FileSearch {
+                path: None,
+                start: start.to_owned(),
+                stopped_at: directory.to_owned(),
+                reason: if repository_root {
+                    SearchStop::RepositoryRoot
+                } else {
+                    SearchStop::FilesystemRoot
+                },
+            });
         }
     }
-    Ok(None)
+    unreachable!("ancestor search always reaches a root")
 }
 
 pub fn read_document<T: DeserializeOwned>(path: &Path) -> Result<T, FileError> {
@@ -156,7 +201,7 @@ pub fn exists(path: &Path) -> Result<bool, FileError> {
 }
 
 pub struct Exclusions {
-    base: PathBuf,
+    pub base: PathBuf,
     matcher: Gitignore,
 }
 

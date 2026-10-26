@@ -3,6 +3,7 @@ mod config;
 mod file;
 mod format;
 mod organize;
+mod settings;
 mod targets;
 
 use std::{
@@ -19,6 +20,7 @@ use crate::{
     config::{Config, parse_exclude},
     format::{EditionOverrides, FormatResolver},
     organize::{FormatOptions, SourceEdition, StyleEdition, organize},
+    settings::{Origin, Resolved},
 };
 
 #[derive(Parser)]
@@ -93,18 +95,22 @@ fn run(args: Args) -> Result<ExitCode, Box<dyn Error>> {
         &cwd,
         args.config.as_deref(),
         EditionOverrides {
-            edition: args.edition,
-            style_edition: args.style_edition,
+            edition: args
+                .edition
+                .map(|value| Resolved::new(value, Origin::CommandLine("--edition"))),
+            style_edition: args
+                .style_edition
+                .map(|value| Resolved::new(value, Origin::CommandLine("--style-edition"))),
         },
         exclude,
     )?;
-    let mut formats = FormatResolver::new(config.editions);
+    let mut formats = FormatResolver::new(config.editions.clone());
     let (mode, inputs) = match args.command {
         Command::Check(inputs) => (Mode::Check, inputs),
         Command::Write(inputs) => (Mode::Write, inputs),
         Command::Files(inputs) => (Mode::Files, inputs),
         Command::Stdin => {
-            format_stdin(formats.for_directory(&cwd)?)?;
+            format_stdin(formats.for_directory(&cwd)?.options())?;
             return Ok(ExitCode::SUCCESS);
         }
     };
@@ -112,9 +118,10 @@ fn run(args: Args) -> Result<ExitCode, Box<dyn Error>> {
     let inputs = paths
         .into_iter()
         .map(|path| {
-            formats
-                .for_file(&path)
-                .map(|options| Input { path, options })
+            formats.for_file(&path).map(|resolved| Input {
+                path,
+                options: resolved.options(),
+            })
         })
         .collect::<Result<Vec<_>, _>>()?;
     Ok(batch::run(&inputs, mode)?)
