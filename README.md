@@ -87,9 +87,9 @@ Run `cargo help modfmt` for all modes and options. See [Usage](docs/usage.md) fo
 
 ### Configuration
 
-Parsing and style editions are inferred from each source file’s Cargo and rustfmt settings. Use `--edition` / `--style-edition` to override them.
+Parsing and style editions are inferred from each source file’s Cargo and rustfmt settings. Use `--edition` / `--style-edition` to override them. Import width and continuation indentation follow rustfmt’s `max_width`, `tab_spaces`, and `hard_tabs` settings.
 
-Place project settings in `modfmt.toml`. See [Configuration](docs/configuration.md) for examples and the [configuration schema](config.schema.json) for all settings and defaults.
+Place project settings in `modfmt.toml`. See [Configuration](docs/configuration.md) for examples and the [configuration schema](config.schema.json) for all `modfmt.toml` settings and defaults.
 
 ## License
 

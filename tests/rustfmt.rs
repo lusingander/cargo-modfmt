@@ -6,8 +6,8 @@ use rstest::rstest;
 
 use crate::common::{command, copy_directory, fixture_path};
 
-fn organize(source: &[u8], style: &str) -> Vec<u8> {
-    let output = command(Path::new(env!("CARGO_MANIFEST_DIR")))
+fn organize(cwd: &Path, source: &[u8], style: &str) -> Vec<u8> {
+    let output = command(cwd)
         .args(["stdin", "--edition", "2024", "--style-edition", style])
         .write_stdin(source.to_vec())
         .output()
@@ -51,6 +51,46 @@ fn organizing_formatted_source_preserves_stable_check(
     #[case] modules: &[&str],
     #[values("2015", "2018", "2021", "2024")] style: &str,
 ) {
+    check_compatibility(fixture, modules, style, "", false);
+}
+
+#[rstest]
+#[case::narrow(80, 4, false)]
+#[case::default_width(100, 4, false)]
+#[case::wide(120, 4, false)]
+#[case::spaces(80, 2, false)]
+#[case::tabs(80, 4, true)]
+#[case::two_column_tabs(80, 2, true)]
+fn custom_layout_preserves_stable_check(
+    #[case] width: usize,
+    #[case] tab_spaces: usize,
+    #[case] hard_tabs: bool,
+    #[values(
+        "cases/use_layout_width/input.rs",
+        "cases/use_layout_nested/input.rs",
+        "cases/use_layout_unicode_tabs/input.rs",
+        "cases/use_layout_merge/input.rs",
+        "cases/use_layout_atomic/input.rs",
+        "cases/use_layout_indentation/input.rs"
+    )]
+    fixture: &str,
+    #[values("2015", "2018", "2021", "2024")] style: &str,
+    #[values(false, true)] crlf: bool,
+) {
+    let settings = format!(
+        r#"max_width = {width}
+tab_spaces = {tab_spaces}
+hard_tabs = {hard_tabs}
+"#
+    );
+    let modules: &[&str] = match fixture {
+        "cases/use_layout_merge/input.rs" => &["alpha", "zebra"],
+        _ => &[],
+    };
+    check_compatibility(fixture, modules, style, &settings, crlf);
+}
+
+fn check_compatibility(fixture: &str, modules: &[&str], style: &str, settings: &str, crlf: bool) {
     let formatter = std::env::var_os("RUSTFMT").unwrap_or_else(|| "rustfmt".into());
     let version = Command::new(&formatter).arg("--version").output().unwrap();
     assert!(version.status.success(), "{version:?}");
@@ -66,7 +106,7 @@ fn organizing_formatted_source_preserves_stable_check(
         format!(
             r#"edition = "2024"
 style_edition = "{style}"
-"#
+{settings}"#
         ),
     )
     .unwrap();
@@ -83,15 +123,19 @@ style_edition = "{style}"
         .unwrap();
     }
     let source = directory.path().join("main.rs");
-    fs::copy(fixture, &source).unwrap();
+    let mut contents = fs::read_to_string(fixture).unwrap();
+    if crlf {
+        contents = contents.replace("\r\n", "\n").replace('\n', "\r\n");
+    }
+    fs::write(&source, contents).unwrap();
     format(&formatter, &version, &config, &source, false);
     format(&formatter, &version, &config, &source, true);
 
-    let organized = organize(&fs::read(&source).unwrap(), style);
+    let organized = organize(directory.path(), &fs::read(&source).unwrap(), style);
     fs::write(&source, &organized).unwrap();
     format(&formatter, &version, &config, &source, true);
     assert_eq!(
-        organize(&organized, style),
+        organize(directory.path(), &organized, style),
         organized,
         "tool must be idempotent"
     );

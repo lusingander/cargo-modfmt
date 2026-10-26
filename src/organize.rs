@@ -4,12 +4,12 @@ mod ordering;
 
 use std::{cmp::Ordering, collections::HashMap, error::Error, fmt, ops::Range, str::FromStr};
 
+pub use layout::LayoutOptions;
 use ra_ap_syntax::ast::{HasAttrs, HasModuleItem, HasName, HasVisibility};
 use ra_ap_syntax::{AstNode, Edition, SyntaxKind, SyntaxToken, TextRange, ast};
 
 use crate::organize::{
     imports::{ImportBinding, ImportKind, ImportTree, identifier_name},
-    layout::{IMPORT_WIDTH, column_after},
     ordering::compare_trees,
 };
 
@@ -17,6 +17,7 @@ use crate::organize::{
 pub struct FormatOptions {
     pub edition: SourceEdition,
     pub style_edition: StyleEdition,
+    pub layout: LayoutOptions,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -159,7 +160,7 @@ struct DeclarationRun<'a> {
 }
 
 impl DeclarationRun<'_> {
-    fn write(&self, output: &mut String) {
+    fn write(&self, output: &mut String, layout: LayoutOptions) {
         let mut previous_group = None;
         for declaration in &self.declarations {
             if let Some(group) = previous_group {
@@ -182,12 +183,13 @@ impl DeclarationRun<'_> {
                         .rsplit('\n')
                         .next()
                         .unwrap_or("");
-                    let column = column_after(0, line);
+                    let column = layout.column_after(0, line);
                     tree.write_layout(
                         output,
-                        IMPORT_WIDTH.saturating_sub(column + 1),
+                        layout.max_width.saturating_sub(column + 1),
                         self.indent,
                         self.newline,
+                        layout,
                     );
                 }
                 DeclarationKind::Module(name) => {
@@ -257,7 +259,7 @@ pub fn organize(source: &str, options: FormatOptions) -> Result<String, Organize
     let mut cursor = 0;
     for run in organizer.runs {
         output.push_str(&body[cursor..run.range.start]);
-        run.write(&mut output);
+        run.write(&mut output, options.layout);
         cursor = run.range.end;
     }
     output.push_str(&body[cursor..]);

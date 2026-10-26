@@ -125,7 +125,7 @@ vendor = { version = '*', optional = true }
     .unwrap();
     fs::write(
         directory.path().join("rustfmt.toml"),
-        r#"max_width = 80
+        r#"comment_width = 80
 imports_layout = 'Vertical'
 unknown_setting = true
 "#,
@@ -278,11 +278,10 @@ fn external_errors_are_checked_for_all_files_before_processing(
 }
 
 #[test]
-fn explicit_editions_do_not_read_external_files() {
+fn explicit_editions_do_not_read_cargo_settings() {
     let directory = tempdir().unwrap();
-    for name in ["Cargo.toml", ".rustfmt.toml"] {
-        fs::write(directory.path().join(name), "invalid TOML").unwrap();
-    }
+    fs::write(directory.path().join("Cargo.toml"), "invalid TOML").unwrap();
+    fs::write(directory.path().join(".rustfmt.toml"), "max_width = 80").unwrap();
     let output = execute(
         directory.path(),
         &["stdin", "--edition", "2024", "--style-edition", "2021"],

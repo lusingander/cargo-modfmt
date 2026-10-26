@@ -2,8 +2,22 @@ use unicode_width::UnicodeWidthStr;
 
 use crate::organize::imports::{ImportAlias, ImportTree, ImportTreeBody};
 
-pub const IMPORT_WIDTH: usize = 100;
-const INDENT_WIDTH: usize = 4;
+#[derive(Clone, Copy, Debug)]
+pub struct LayoutOptions {
+    pub max_width: usize,
+    pub tab_spaces: usize,
+    pub hard_tabs: bool,
+}
+
+impl Default for LayoutOptions {
+    fn default() -> Self {
+        Self {
+            max_width: 100,
+            tab_spaces: 4,
+            hard_tabs: false,
+        }
+    }
+}
 
 impl ImportTree {
     fn write_inline(&self, output: &mut String) {
@@ -39,7 +53,14 @@ impl ImportTree {
         output.push('}');
     }
 
-    pub fn write_layout(&self, output: &mut String, width: usize, indent: &str, newline: &str) {
+    pub fn write_layout(
+        &self,
+        output: &mut String,
+        width: usize,
+        indent: &str,
+        newline: &str,
+        options: LayoutOptions,
+    ) {
         let ImportTreeBody::Group(children) = &self.body else {
             self.write_inline(output);
             return;
@@ -50,13 +71,20 @@ impl ImportTree {
         }
         prefix.push_str(&self.path.join("::"));
         prefix.push_str("::");
-        let child_indent = format!("{indent}{}", " ".repeat(INDENT_WIDTH));
-        let child_width = IMPORT_WIDTH.saturating_sub(column_after(0, &child_indent) + 1);
+        let continuation = if options.hard_tabs {
+            "\t".to_owned()
+        } else {
+            " ".repeat(options.tab_spaces)
+        };
+        let child_indent = format!("{indent}{continuation}");
+        let child_width = options
+            .max_width
+            .saturating_sub(options.column_after(0, &child_indent) + 1);
         let rendered: Vec<_> = children
             .iter()
             .map(|child| {
                 let mut text = String::new();
-                child.write_layout(&mut text, child_width, &child_indent, newline);
+                child.write_layout(&mut text, child_width, &child_indent, newline, options);
                 text
             })
             .collect();
@@ -119,11 +147,14 @@ impl ImportTree {
     }
 }
 
-pub fn column_after(column: usize, text: &str) -> usize {
-    text.chars()
-        .fold(column, |column, character| match character {
-            '\r' | '\n' => 0,
-            '\t' => column + INDENT_WIDTH - column % INDENT_WIDTH,
-            _ => column + character.len_utf8(),
-        })
+impl LayoutOptions {
+    pub fn column_after(self, column: usize, text: &str) -> usize {
+        text.chars()
+            .fold(column, |column, character| match character {
+                '\r' | '\n' => 0,
+                '\t' if self.tab_spaces > 0 => column + self.tab_spaces - column % self.tab_spaces,
+                '\t' => column,
+                _ => column + character.len_utf8(),
+            })
+    }
 }

@@ -1,6 +1,6 @@
 # Configuration
 
-Project settings use a TOML file named `modfmt.toml`. All settings are optional. [config.schema.json](../config.schema.json) is the authoritative reference for setting names, types, defaults, and allowed values. Exclusion glob syntax is additionally validated by the application.
+Project settings use a TOML file named `modfmt.toml`. All settings are optional. [config.schema.json](../config.schema.json) is the authoritative reference for `modfmt.toml` setting names, types, defaults, and allowed values. Exclusion glob syntax is additionally validated by the application.
 
 For example, to exclude fixtures and vendored code:
 
@@ -18,7 +18,7 @@ exclude = ["fixtures/**", "vendor/**"]
 | `format.edition` | Select the Rust edition used to parse source. | Automatic lookup; see [edition precedence](#editions-and-automatic-lookup). |
 | `format.style_edition` | Select the style edition used to sort imports. | Automatic lookup; see [edition precedence](#editions-and-automatic-lookup). |
 
-See [file selection](#file-selection) for exclusion syntax and traversal rules. CLI overrides are described below.
+Import width and continuation indentation are read separately from rustfmt configuration; see [import width and indentation](#import-width-and-indentation). See [file selection](#file-selection) for exclusion syntax and traversal rules. CLI overrides are described below.
 
 ## Loading settings
 
@@ -52,11 +52,35 @@ For each selected source, lookup starts at its canonical parent directory and wa
 
 The nearest Cargo.toml supplies `[package].edition`. An omitted package edition means `2015`, matching Cargo. `edition.workspace = true` uses `[workspace.package].edition` from the nearest ancestor workspace, or from the workspace explicitly referenced by `package.workspace`. An explicit reference can point outside the normal search boundary. A virtual workspace manifest has no package edition; its shared value is used only by packages that opt into inheritance.
 
-Only edition-related settings are interpreted. Other rustfmt and Cargo keys are ignored; dependencies are not resolved and neither Cargo nor rustfmt is invoked. Unusual target paths outside a package, or one source shared by targets with different editions, are not inferred from Cargo's target graph.
+Cargo settings are interpreted only for edition lookup. From rustfmt configuration, the tool reads edition settings plus `max_width`, `tab_spaces`, and `hard_tabs`. Other rustfmt and Cargo keys are ignored; dependencies are not resolved and neither Cargo nor rustfmt is invoked. Unusual target paths outside a package, or one source shared by targets with different editions, are not inferred from Cargo's target graph.
 
-External settings are read only when needed. If both editions are explicit, external lookup is unnecessary. A required file that is unreadable, malformed, not a regular file, or has invalid edition settings causes an error rather than a fallback. Missing workspace inheritance values also cause an error. All selected files' editions are resolved before listing or writing, including in `files` mode; source contents are not read during this step.
+Rustfmt configuration is searched for every selected source, even when both editions are explicit, because it also supplies layout settings. Cargo settings are read only when the parsing edition is not explicit. A required file that is unreadable, malformed, not a regular file, or has invalid supported settings causes an error rather than a fallback. Missing workspace inheritance values also cause an error. All selected files' format settings are resolved before listing or writing, including in `files` mode; source contents are not read during this step.
 
 When no style edition is configured, changing the parsing edition also changes the sorting style. To use 2024 sorting independently of the parsing edition, use `--style-edition 2024` or set `format.style_edition = "2024"`.
+
+## Import width and indentation
+
+The nearest rustfmt configuration supplies these settings independently for each source file, using the same lookup rules described above. Missing settings use the defaults below; parent configurations are not merged.
+
+| Rustfmt key | Purpose | Default |
+| --- | --- | --- |
+| `max_width` | Target line width for import layout, including the declaration prefix and indentation. | `100` |
+| `tab_spaces` | Spaces per continuation level and columns per tab when calculating line width. | `4` |
+| `hard_tabs` | Use a tab per continuation level instead of spaces. | `false` |
+
+For example, in `rustfmt.toml`:
+
+```toml
+max_width = 80
+tab_spaces = 2
+hard_tabs = false
+```
+
+These keys are read only from rustfmt configuration, including for `stdin`, which looks up settings from the working directory. They have no CLI or `modfmt.toml` overrides. `--config` still selects only the modfmt configuration and does not change rustfmt lookup.
+
+`max_width` and `tab_spaces` accept nonnegative integers; `hard_tabs` accepts a boolean. `tab_spaces = 0` adds no continuation spaces and is rejected when combined with `hard_tabs = true`.
+
+The tool preserves each section's existing base indentation and uses these settings for newly generated continuation lines and width calculations. It does not reindent surrounding Rust code or normalize line endings. A long indivisible path can exceed `max_width`; the width is a layout target.
 
 ## File selection
 
@@ -77,6 +101,6 @@ cargo modfmt files . --exclude 'generated/**'
 cargo modfmt check src --config settings/modfmt.toml
 ```
 
-Use `files` to preview the selection before writing. The `stdin` command validates the configuration and resolves both editions, but does not apply file selection rules.
+Use `files` to preview the selection before writing. The `stdin` command validates the configuration and resolves editions and layout settings, but does not apply file selection rules.
 
-Group order, alias order, merging policy, width, indentation, and import layout remain fixed. Rustfmt options other than the editions are not applied. See [rustfmt compatibility](rustfmt-compatibility.md) for the supported formatting settings and workflow.
+Group order, alias order, merging policy, Mixed import layout, and Block import indentation remain fixed. Rustfmt options other than the editions and the three layout settings above are not applied. See [rustfmt compatibility](rustfmt-compatibility.md) for the supported formatting settings and workflow.
