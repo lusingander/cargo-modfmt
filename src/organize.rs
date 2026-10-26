@@ -4,6 +4,7 @@ mod ordering;
 
 use std::{cmp::Ordering, collections::HashMap, error::Error, fmt, ops::Range, str::FromStr};
 
+pub use layout::LayoutOptions;
 use ra_ap_syntax::ast::{HasAttrs, HasModuleItem, HasName, HasVisibility};
 use ra_ap_syntax::{AstNode, Edition, SyntaxKind, SyntaxToken, TextRange, ast};
 
@@ -11,8 +12,6 @@ use crate::organize::{
     imports::{ImportBinding, ImportKind, ImportTree, identifier_name},
     ordering::compare_trees,
 };
-
-pub use layout::LayoutOptions;
 
 #[derive(Clone, Copy, Debug)]
 pub struct FormatOptions {

@@ -17,7 +17,7 @@ use clap::{Parser, Subcommand};
 use crate::{
     batch::{Input, Mode},
     config::{Config, parse_exclude},
-    editions::{EditionOverrides, EditionResolver},
+    editions::{EditionOverrides, FormatResolver},
     organize::{FormatOptions, SourceEdition, StyleEdition, organize},
 };
 
@@ -98,13 +98,13 @@ fn run(args: Args) -> Result<ExitCode, Box<dyn Error>> {
         },
         exclude,
     )?;
-    let mut editions = EditionResolver::new(config.editions);
+    let mut formats = FormatResolver::new(config.editions);
     let (mode, inputs) = match args.command {
         Command::Check(inputs) => (Mode::Check, inputs),
         Command::Write(inputs) => (Mode::Write, inputs),
         Command::Files(inputs) => (Mode::Files, inputs),
         Command::Stdin => {
-            format_stdin(editions.for_directory(&cwd)?)?;
+            format_stdin(formats.for_directory(&cwd)?)?;
             return Ok(ExitCode::SUCCESS);
         }
     };
@@ -112,7 +112,7 @@ fn run(args: Args) -> Result<ExitCode, Box<dyn Error>> {
     let inputs = paths
         .into_iter()
         .map(|path| {
-            editions
+            formats
                 .for_file(&path)
                 .map(|options| Input { path, options })
         })

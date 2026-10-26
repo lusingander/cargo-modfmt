@@ -10,7 +10,7 @@ use serde::Deserialize;
 use crate::{
     config::{exists, find_ancestor_file, read_document},
     file::FileError,
-    organize::{FormatOptions, SourceEdition, StyleEdition},
+    organize::{FormatOptions, LayoutOptions, SourceEdition, StyleEdition},
 };
 
 #[derive(Clone, Copy)]
@@ -19,7 +19,7 @@ pub struct EditionOverrides {
     pub style_edition: Option<StyleEdition>,
 }
 
-pub struct EditionResolver {
+pub struct FormatResolver {
     overrides: EditionOverrides,
     directories: HashMap<PathBuf, FormatOptions>,
 }
@@ -28,6 +28,9 @@ pub struct EditionResolver {
 struct RustfmtDocument {
     edition: Option<String>,
     style_edition: Option<String>,
+    max_width: Option<usize>,
+    tab_spaces: Option<usize>,
+    hard_tabs: Option<bool>,
 }
 
 #[derive(Deserialize)]
@@ -65,7 +68,7 @@ struct WorkspacePackage {
     edition: Option<String>,
 }
 
-impl EditionResolver {
+impl FormatResolver {
     pub fn new(overrides: EditionOverrides) -> Self {
         Self {
             overrides,
@@ -75,23 +78,14 @@ impl EditionResolver {
 
     pub fn for_file(&mut self, path: &Path) -> Result<FormatOptions, FileError> {
         let canonical = fs::canonicalize(path).map_err(|error| {
-            FileError::new(path, "resolve source path for edition settings in", error)
+            FileError::new(path, "resolve source path for format settings in", error)
         })?;
         self.for_directory(canonical.parent().unwrap())
     }
 
     pub fn for_directory(&mut self, directory: &Path) -> Result<FormatOptions, FileError> {
-        if let (Some(edition), Some(style_edition)) =
-            (self.overrides.edition, self.overrides.style_edition)
-        {
-            return Ok(FormatOptions {
-                edition,
-                style_edition,
-                layout: Default::default(),
-            });
-        }
         let directory = fs::canonicalize(directory).map_err(|error| {
-            FileError::new(directory, "resolve edition settings directory", error)
+            FileError::new(directory, "resolve format settings directory", error)
         })?;
         if let Some(options) = self.directories.get(&directory) {
             return Ok(*options);
@@ -106,22 +100,35 @@ impl EditionResolver {
         };
         let mut rustfmt_edition = None;
         let mut rustfmt_style = None;
-        let needs_rustfmt = self.overrides.style_edition.is_none()
+        let mut layout = LayoutOptions::default();
+        let needs_editions = self.overrides.style_edition.is_none()
             || (self.overrides.edition.is_none() && cargo.is_none());
-        if needs_rustfmt
-            && let Some(path) = find_ancestor_file(&directory, &[".rustfmt.toml", "rustfmt.toml"])?
-        {
+        if let Some(path) = find_ancestor_file(&directory, &[".rustfmt.toml", "rustfmt.toml"])? {
             let document: RustfmtDocument = read_document(&path)?;
-            rustfmt_edition = document
-                .edition
-                .as_deref()
-                .map(|value| parse_setting(&path, "edition", value))
-                .transpose()?;
-            rustfmt_style = document
-                .style_edition
-                .as_deref()
-                .map(|value| parse_setting(&path, "style_edition", value))
-                .transpose()?;
+            layout = LayoutOptions {
+                max_width: document.max_width.unwrap_or(layout.max_width),
+                tab_spaces: document.tab_spaces.unwrap_or(layout.tab_spaces),
+                hard_tabs: document.hard_tabs.unwrap_or(layout.hard_tabs),
+            };
+            if layout.hard_tabs && layout.tab_spaces == 0 {
+                return Err(FileError::new(
+                    &path,
+                    "validate format settings in",
+                    io::Error::other("tab_spaces must be greater than zero when hard_tabs is true"),
+                ));
+            }
+            if needs_editions {
+                rustfmt_edition = document
+                    .edition
+                    .as_deref()
+                    .map(|value| parse_setting(&path, "edition", value))
+                    .transpose()?;
+                rustfmt_style = document
+                    .style_edition
+                    .as_deref()
+                    .map(|value| parse_setting(&path, "style_edition", value))
+                    .transpose()?;
+            }
         }
         let edition = self
             .overrides
@@ -136,7 +143,7 @@ impl EditionResolver {
                 .style_edition
                 .or(rustfmt_style)
                 .unwrap_or_else(|| edition.into()),
-            layout: Default::default(),
+            layout,
         };
         self.directories.insert(directory, options);
         Ok(options)
