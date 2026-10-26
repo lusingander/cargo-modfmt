@@ -349,6 +349,7 @@ mod tests {
             FormatOptions {
                 edition: crate::organize::SourceEdition::E2024,
                 style_edition: crate::organize::StyleEdition::E2024,
+                layout: Default::default(),
             },
         )
         .unwrap();

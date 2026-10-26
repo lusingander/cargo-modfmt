@@ -87,6 +87,7 @@ impl EditionResolver {
             return Ok(FormatOptions {
                 edition,
                 style_edition,
+                layout: Default::default(),
             });
         }
         let directory = fs::canonicalize(directory).map_err(|error| {
@@ -135,6 +136,7 @@ impl EditionResolver {
                 .style_edition
                 .or(rustfmt_style)
                 .unwrap_or_else(|| edition.into()),
+            layout: Default::default(),
         };
         self.directories.insert(directory, options);
         Ok(options)
