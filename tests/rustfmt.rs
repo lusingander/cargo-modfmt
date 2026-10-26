@@ -77,8 +77,12 @@ fn custom_layout_preserves_stable_check(
     #[values("2015", "2018", "2021", "2024")] style: &str,
     #[values(false, true)] crlf: bool,
 ) {
-    let settings =
-        format!("max_width = {width}\ntab_spaces = {tab_spaces}\nhard_tabs = {hard_tabs}\n");
+    let settings = format!(
+        r#"max_width = {width}
+tab_spaces = {tab_spaces}
+hard_tabs = {hard_tabs}
+"#
+    );
     let modules: &[&str] = match fixture {
         "cases/use_layout_merge/input.rs" => &["alpha", "zebra"],
         _ => &[],

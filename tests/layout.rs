@@ -9,7 +9,11 @@ use crate::common::command;
 
 const INPUT: &str = "use vendor::{Zulu, Gamma, Beta, Alpha};\n";
 const INLINE: &str = "use vendor::{Alpha, Beta, Gamma, Zulu};\n";
-const WRAPPED: &str = "use vendor::{\n    Alpha, Beta,\n    Gamma, Zulu,\n};\n";
+const WRAPPED: &str = r#"use vendor::{
+    Alpha, Beta,
+    Gamma, Zulu,
+};
+"#;
 
 fn project(config: &str) -> TempDir {
     let directory = tempdir().unwrap();
@@ -35,20 +39,37 @@ fn organize(cwd: &Path, args: &[&str], source: &str) -> String {
 #[case::wide("max_width = 120", INLINE)]
 #[case::narrow("max_width = 20", WRAPPED)]
 #[case::spaces(
-    "max_width = 20\ntab_spaces = 2",
-    "use vendor::{\n  Alpha, Beta,\n  Gamma, Zulu,\n};\n"
+    r#"max_width = 20
+tab_spaces = 2
+"#,
+    r#"use vendor::{
+  Alpha, Beta,
+  Gamma, Zulu,
+};
+"#
 )]
 #[case::tabs(
-    "max_width = 20\nhard_tabs = true",
+    r#"max_width = 20
+hard_tabs = true
+"#,
     "use vendor::{\n\tAlpha, Beta,\n\tGamma, Zulu,\n};\n"
 )]
 #[case::two_column_tabs(
-    "max_width = 20\ntab_spaces = 2\nhard_tabs = true",
+    r#"max_width = 20
+tab_spaces = 2
+hard_tabs = true
+"#,
     "use vendor::{\n\tAlpha, Beta,\n\tGamma, Zulu,\n};\n"
 )]
 #[case::zero_indent(
-    "max_width = 20\ntab_spaces = 0",
-    "use vendor::{\nAlpha, Beta, Gamma,\nZulu,\n};\n"
+    r#"max_width = 20
+tab_spaces = 0
+"#,
+    r#"use vendor::{
+Alpha, Beta, Gamma,
+Zulu,
+};
+"#
 )]
 fn rustfmt_layout_is_used_even_with_explicit_editions(
     #[case] config: &str,
@@ -63,7 +84,12 @@ fn rustfmt_layout_is_used_even_with_explicit_editions(
 
 #[test]
 fn nearest_rustfmt_file_is_used_without_merging_and_hidden_name_wins() {
-    let directory = project("max_width = 10\ntab_spaces = 2\nhard_tabs = true");
+    let directory = project(
+        r#"max_width = 10
+tab_spaces = 2
+hard_tabs = true
+"#,
+    );
     let child = directory.path().join("child");
     fs::create_dir(&child).unwrap();
     fs::write(child.join("rustfmt.toml"), "max_width = 20").unwrap();
@@ -119,7 +145,11 @@ fn each_file_uses_its_own_layout_independently_of_cwd_and_modfmt_config() {
 #[case::negative_tab_spaces("tab_spaces = -1")]
 #[case::string_tab_spaces("tab_spaces = '2'")]
 #[case::string_hard_tabs("hard_tabs = 'true'")]
-#[case::zero_tab_width("tab_spaces = 0\nhard_tabs = true")]
+#[case::zero_tab_width(
+    r#"tab_spaces = 0
+hard_tabs = true
+"#
+)]
 fn invalid_layout_is_checked_before_listing_or_processing_any_files(
     #[case] config: &str,
     #[values("files", "check", "write")] mode: &str,
@@ -156,14 +186,23 @@ fn invalid_layout_is_checked_before_listing_or_processing_any_files(
 
 #[test]
 fn zero_width_does_not_panic() {
-    let directory = project("max_width = 0\ntab_spaces = 0");
+    let directory = project(
+        r#"max_width = 0
+tab_spaces = 0
+"#,
+    );
     let organized = organize(directory.path(), &[], INPUT);
     assert_eq!(organize(directory.path(), &[], &organized), organized);
 }
 
 #[test]
 fn configured_layout_preserves_bom_crlf_and_missing_final_newline() {
-    let directory = project("max_width = 20\ntab_spaces = 2\nhard_tabs = true");
+    let directory = project(
+        r#"max_width = 20
+tab_spaces = 2
+hard_tabs = true
+"#,
+    );
     let source = "\u{feff}use vendor::{Zulu,\r\nGamma, Beta, Alpha};";
     let expected = "\u{feff}use vendor::{\r\n\tAlpha, Beta,\r\n\tGamma, Zulu,\r\n};";
     assert_eq!(organize(directory.path(), &[], source), expected);
