@@ -160,3 +160,12 @@ fn zero_width_does_not_panic() {
     let organized = organize(directory.path(), &[], INPUT);
     assert_eq!(organize(directory.path(), &[], &organized), organized);
 }
+
+#[test]
+fn configured_layout_preserves_bom_crlf_and_missing_final_newline() {
+    let directory = project("max_width = 20\ntab_spaces = 2\nhard_tabs = true");
+    let source = "\u{feff}use vendor::{Zulu,\r\nGamma, Beta, Alpha};";
+    let expected = "\u{feff}use vendor::{\r\n\tAlpha, Beta,\r\n\tGamma, Zulu,\r\n};";
+    assert_eq!(organize(directory.path(), &[], source), expected);
+    assert_eq!(organize(directory.path(), &[], expected), expected);
+}
