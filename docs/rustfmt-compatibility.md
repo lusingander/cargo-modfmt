@@ -368,15 +368,13 @@ Disabling `reorder_imports` or `reorder_modules` in rustfmt does not disable sor
 
 ## Comparison versions and verification
 
-The comparisons in this guide were checked on 2026-10-24 with:
+The comparisons and compatibility checks in this guide use these reference versions:
 
 | Formatter | Version | Comparison settings |
 | --- | --- | --- |
-| Stable | `rustfmt 1.10.0-stable (58cf8f9c35 2026-10-13)` | Edition and style edition 2024; other settings at their defaults |
-| Nightly | `rustfmt 1.11.0-nightly (19833af722 2026-10-20)` | Same settings, plus `imports_granularity = "Crate"` and `group_imports = "StdExternalCrate"` |
+| Stable | `rustfmt 1.10.0-stable (58cf8f9c35 2026-10-13)` | Parsing edition 2024; all four supported style editions; default and custom layout settings described below |
+| Nightly | `rustfmt 1.11.0-nightly (19833af722 2026-10-20)` | Parsing and style editions 2024; `imports_granularity = "Crate"` and `group_imports = "StdExternalCrate"`; other settings at their defaults |
 
-On 2026-10-25, stable checks and alternating-tool byte equality were also verified for all four supported style editions. Nightly examples still refer to the original 2024 settings.
-
-On 2026-10-26, stable checks and alternating-tool byte equality were additionally verified for widths 80, 100, and 120, two-space indentation, and hard tabs with tab widths 2 and 4. These checks cover all four style editions, LF and CRLF, nested imports, merged imports, and Unicode identifiers using the stable version above.
+Stable compatibility checks verify both rustfmt checks and byte equality when alternating the tools. They cover all four supported style editions, default layout settings, widths 80, 100, and 120, two-space indentation, and hard tabs with tab widths 2 and 4. Custom layout checks include LF and CRLF, nested imports, merged imports, and Unicode identifiers.
 
 Compatibility fixtures use parsing edition 2024; compile/run fixtures also cover older parsing editions.
