@@ -1,6 +1,6 @@
 [package]
 name = "cargo-modfmt"
-version = "0.1.0"
+version = "0.2.0"
 description = "Cargo subcommand that sorts and groups Rust mod and use declarations"
 authors = ["Kyosuke Fujimoto <kyoro.f@gmail.com>"]
 homepage = "https://github.com/lusingander/cargo-modfmt"
