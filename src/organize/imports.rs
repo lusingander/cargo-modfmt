@@ -1,5 +1,4 @@
-use ra_ap_syntax::ast::HasName;
-use ra_ap_syntax::{AstNode, SyntaxKind, ast};
+use ra_ap_syntax::{AstNode, SyntaxKind, ast, ast::HasName};
 
 pub struct ImportTree {
     pub path: Vec<String>,

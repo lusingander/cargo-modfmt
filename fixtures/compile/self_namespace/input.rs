@@ -2,10 +2,32 @@ mod model;
 
 mod ordinary {
     use crate::model::branch::child;
-    use crate::model::branch as Both;
+    use crate::model::fallback::*;
+    use crate::model::branch;
 
     pub fn value() -> u32 {
-        Both() + Both::child() + child()
+        branch() + branch::child() + child() + branch!()
+    }
+}
+
+mod ordinary_glob {
+    use crate::model::branch as Both;
+    use crate::model::branch::*;
+
+    pub fn value() -> u32 {
+        Both() + Both::child() + child() + Both!()
+    }
+}
+
+mod ordinary_and_self {
+    use crate::model::branch::{self as selected};
+    use crate::model::branch as Both;
+    use crate::model::branch::child;
+
+    fn selected() -> u32 { 8 }
+
+    pub fn value() -> u32 {
+        Both() + Both!() + selected() + selected::child() + child()
     }
 }
 
@@ -58,7 +80,8 @@ mod qualifier_roots {
 }
 
 fn main() {
-    let total = ordinary::value() + type_only::value() + merged_type_only::value()
+    let total = ordinary::value() + ordinary_glob::value() + ordinary_and_self::value()
+        + type_only::value() + merged_type_only::value()
         + multiple_self::value() + qualifier_roots::value();
     println!("{total}");
 }

@@ -35,6 +35,7 @@ fn format(formatter: &OsString, version: &str, config: &Path, source: &Path, che
 #[case::groups("cases/mod_use_groups/input.rs", &["alpha", "beta", "zebra", "utils"])]
 #[case::raw("cases/use_raw_order/input.rs", &["alpha", "beta", "gamma", "match", "zeta"])]
 #[case::merge("cases/use_layout_merge/input.rs", &["alpha", "zebra"])]
+#[case::prefixes("cases/use_merge_prefixes/input.rs", &[])]
 #[case::aliases("cases/use_alias_order/input.rs", &[])]
 #[case::normalization("cases/use_normalization/input.rs", &[])]
 #[case::visibility("cases/use_merge_visibility/input.rs", &[])]
@@ -70,6 +71,7 @@ fn custom_layout_preserves_stable_check(
         "cases/use_layout_nested/input.rs",
         "cases/use_layout_unicode_tabs/input.rs",
         "cases/use_layout_merge/input.rs",
+        "cases/use_merge_prefixes/input.rs",
         "cases/use_layout_atomic/input.rs",
         "cases/use_layout_indentation/input.rs"
     )]

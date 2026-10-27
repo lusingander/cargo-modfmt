@@ -4,8 +4,7 @@ use foo::Z;
 
 fn duplicate_logical_names() {}
 
-use foo::r#a;
-use foo::a::A;
+use foo::{r#a, a::A};
 
 fn ordinary_prefix_with_different_spelling() {}
 

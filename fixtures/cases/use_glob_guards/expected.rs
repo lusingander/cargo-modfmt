@@ -10,6 +10,4 @@ use foo::*;
 
 fn ordinary_root() {}
 
-use foo::B;
-use foo::a as Module;
-use foo::a::*;
+use foo::{B, a as Module, a::*};

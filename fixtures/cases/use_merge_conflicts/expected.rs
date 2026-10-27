@@ -5,9 +5,7 @@ use foo::z::Z;
 
 fn root_and_child() {}
 
-use foo::a;
-use foo::a::B;
-use foo::z::Z;
+use foo::{a, a::B, z::Z};
 
 fn leaf_and_child() {}
 
@@ -23,8 +21,7 @@ use foo::{B, a::A, a::A};
 
 fn repeated_element() {}
 
-use foo::c::C;
-use foo::{a, a::B, z::Z};
+use foo::{a, a::B, c::C, z::Z};
 
 fn nested_leaf_and_child() {}
 
