@@ -14,6 +14,21 @@ use tempfile::tempdir;
 
 use crate::common::fixture;
 
+#[test]
+fn closed_config_output_reports_failure_without_writing_files() {
+    let project = tempdir().unwrap();
+    std::fs::create_dir(project.path().join(".git")).unwrap();
+    let output = execute(project.path(), &["config"], Stream::Stdout, Stdio::null());
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert!(output.stdout.is_empty());
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .starts_with("error: cannot report configuration for")
+    );
+    assert_eq!(std::fs::read_dir(project.path()).unwrap().count(), 1);
+}
+
 #[derive(Clone, Copy, Debug)]
 enum Stream {
     Stdout,

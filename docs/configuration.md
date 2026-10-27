@@ -29,6 +29,56 @@ Import width and continuation indentation are read separately from rustfmt confi
 
 `--edition` overrides `format.edition`, and `--style-edition` overrides `format.style_edition`. `--exclude` adds patterns to `files.exclude`. CLI overrides do not bypass validation of the configuration file.
 
+## Inspecting resolved settings
+
+Use `config` to see the effective settings for one target, together with the origins of the adopted values:
+
+```sh
+# Use the working directory as the lookup starting point, like stdin
+cargo modfmt config
+
+# Inspect one file, or use a directory as the lookup starting point
+cargo modfmt config src/lib.rs
+cargo modfmt config crates/member
+
+# Apply the same overrides as a formatting invocation
+cargo modfmt config src/lib.rs --edition 2021 --exclude 'generated/**'
+cargo modfmt config src/lib.rs --config settings/modfmt.toml
+```
+
+The optional path must be an existing regular file or directory. Its final component cannot be a symlink; symlinks in parent directories are resolved normally. A file uses its canonical parent directory for external lookup. A directory is used directly, without recursion, and does not imply that all files below it share the same settings. With no path, the lookup starting point is the working directory, as for `stdin`.
+
+The report includes:
+
+- `edition`, `style_edition`, `max_width`, `tab_spaces`, and `hard_tabs`.
+- `files.respect_gitignore`, the combined `files.exclude` patterns, and their base directory.
+- The target, working directory, and external configuration lookup starting point.
+- The selected modfmt and rustfmt configuration files and the Cargo manifest when needed. Automatic lookups show where the search actually stopped and whether it found a configuration, reached a Git repository root, or reached the filesystem root.
+
+For example, individual report entries may look like this:
+
+```text
+edition: 2021
+  from "/project/Cargo.toml": package.edition
+
+style_edition: 2021
+  fallback to resolved edition
+
+max_width: 80
+  from "/project/rustfmt.toml": max_width
+
+tab_spaces: 4
+  built-in default; omitted in "/project/rustfmt.toml"
+```
+
+Origins distinguish CLI overrides, explicit file settings, omitted settings using built-in defaults, the Cargo default of 2015 for an omitted package edition, and style edition falling back to the resolved parsing edition. A value explicitly set to its default is still attributed to its configuration file. Workspace inheritance shows both the package manifest requesting inheritance and the workspace manifest supplying the value.
+
+The same resolution and validation are used for inspection and formatting. A parsing edition override makes Cargo lookup unnecessary, which is reported as `not searched`, rather than `none`. The report does not read additional files just to show overridden values or trace every possible ancestor. Normal configuration errors also fail inspection, before any report is printed. A successful report exits with code 0; configuration, target, or output failures exit with code 1, and invalid command line arguments with code 2.
+
+The `modfmt.toml` lookup still starts at the working directory, independently of the inspection target. `--config` selects only that configuration and does not rebase Cargo or rustfmt lookup. `--exclude` appends patterns to the displayed settings and identifies them as CLI additions.
+
+File selection is not evaluated: excluded, hidden, and `target` paths can be inspected, and neither directory traversal nor `.gitignore` loading occurs. Use `files` to preview selected sources. `config` does not open source files, read stdin, format or write source, or explain skipped declaration sections. The output is a human-readable report, not an exportable configuration or a machine-readable format.
+
 ## Editions and automatic lookup
 
 `edition` controls parsing; `style_edition` controls import sorting. Both accept `2015`, `2018`, `2021`, and `2024`. Style editions 2015–2021 use rustfmt's older name categories and lexical order; 2024 uses version sorting. For example, `alpha10` precedes `alpha2` in the older style and follows it in 2024.

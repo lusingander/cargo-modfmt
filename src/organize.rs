@@ -28,6 +28,17 @@ pub enum SourceEdition {
     E2024,
 }
 
+impl fmt::Display for SourceEdition {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::E2015 => "2015",
+            Self::E2018 => "2018",
+            Self::E2021 => "2021",
+            Self::E2024 => "2024",
+        })
+    }
+}
+
 impl FromStr for SourceEdition {
     type Err = String;
 
@@ -61,6 +72,17 @@ pub enum StyleEdition {
     E2018,
     E2021,
     E2024,
+}
+
+impl fmt::Display for StyleEdition {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::E2015 => "2015",
+            Self::E2018 => "2018",
+            Self::E2021 => "2021",
+            Self::E2024 => "2024",
+        })
+    }
 }
 
 impl From<SourceEdition> for StyleEdition {

@@ -26,7 +26,7 @@ pub fn collect(paths: &[PathBuf], config: &Config) -> Result<Vec<PathBuf>, FileE
             if default_excluded(&canonical) || config.exclusions.matches(&canonical, true) {
                 continue;
             }
-            let Some(mut rules) = parent_rules(&canonical, config.respect_gitignore)? else {
+            let Some(mut rules) = parent_rules(&canonical, config.respect_gitignore.value)? else {
                 continue;
             };
             let mut discovered = Vec::new();
@@ -57,7 +57,7 @@ fn walk(
     {
         return Ok(());
     }
-    let added = if config.respect_gitignore {
+    let added = if config.respect_gitignore.value {
         load_rules(canonical, rules)?
     } else {
         false
