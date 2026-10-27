@@ -1,5 +1,4 @@
-use ra_ap_syntax::ast::HasName;
-use ra_ap_syntax::{AstNode, SyntaxKind, ast};
+use ra_ap_syntax::{AstNode, SyntaxKind, ast, ast::HasName};
 
 pub struct ImportTree {
     pub path: Vec<String>,
@@ -270,15 +269,19 @@ impl ImportTree {
                 next += 1;
             }
             let branch = &bindings[start..next];
-            if branch[0].kind == ImportKind::Normal && branch[0].path.len() == end + 1 {
-                children.extend(branch.iter().map(|binding| Self {
-                    path: binding.path[end..].to_vec(),
-                    absolute: false,
-                    body: ImportTreeBody::Leaf(binding.alias.clone()),
-                    origin: binding.origin,
-                }));
-            } else {
-                children.push(Self::from_bindings(branch, end));
+            let normal_count = branch
+                .iter()
+                .take_while(|binding| {
+                    binding.kind == ImportKind::Normal && binding.path.len() == end + 1
+                })
+                .count();
+            children.extend(
+                branch[..normal_count]
+                    .iter()
+                    .map(|binding| Self::from_bindings(std::slice::from_ref(binding), end)),
+            );
+            if normal_count < branch.len() {
+                children.push(Self::from_bindings(&branch[normal_count..], end));
             }
             start = next;
         }

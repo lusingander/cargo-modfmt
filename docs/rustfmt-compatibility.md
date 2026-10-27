@@ -116,7 +116,7 @@ Sorting those aliases would bring the two `B` imports together, which causes the
 
 For import classification, `r#std` is treated as `std` in every style edition, and a leading `::` does not change the import group.
 
-Import path sorting depends on the style edition: 2024 compares names without `r#`, while 2015–2021 compare the original spelling including that prefix. For example, `use foo::{r#beta, alpha, gamma};` becomes `use foo::{alpha, r#beta, gamma};` in 2024, but `use foo::{alpha, gamma, r#beta};` in the older styles. Module-name and alias comparisons, and duplicate and prefix safety checks, ignore `r#` in every style edition. Output retains the raw spelling.
+Import path sorting depends on the style edition: 2024 compares names without `r#`, while 2015–2021 compare the original spelling including that prefix. For example, `use foo::{r#beta, alpha, gamma};` becomes `use foo::{alpha, r#beta, gamma};` in 2024, but `use foo::{alpha, gamma, r#beta};` in the older styles. Module-name comparisons, alias comparisons, and duplicate checks ignore `r#` in every style edition. Output retains the raw spelling.
 
 Input:
 
@@ -162,14 +162,12 @@ Even matching imports remain separate in the following cases. Each row shows a c
 
 | Condition | Example |
 | --- | --- |
-| A normal import is a prefix of another imported path | `use foo::a;` and `use foo::a::B;` |
-| A normal import shares its path with a glob or a type-only `self` import | `use foo::a;` and `use foo::a::*;` |
 | An ordinary import names the root itself | `use foo as A;` and `use foo as B;` |
 | The same import occurs more than once | `use foo::A;` and `use foo::A;` |
 
 If any of these occurs, merging is declined for **all imports with that matching root and visibility in the section**. Other roots can still merge. The declarations that remain separate are still sorted and formatted.
 
-The compared nightly configuration can combine more of these cases and remove duplicates. The tool deliberately retains duplicates and avoids rewriting an ordinary import into a type-only `self` import. It also keeps glob imports and explicit names together without removing either:
+The compared nightly configuration can combine more of these cases and remove duplicates. The tool deliberately retains duplicates and keeps ordinary imports as siblings of their descendants (`use foo::{a, a::B};`) to avoid converting them into type-only `self` imports. It also keeps glob imports and explicit names together without removing either:
 
 Input:
 

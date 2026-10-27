@@ -5,8 +5,10 @@ mod ordering;
 use std::{cmp::Ordering, collections::HashMap, error::Error, fmt, ops::Range, str::FromStr};
 
 pub use layout::LayoutOptions;
-use ra_ap_syntax::ast::{HasAttrs, HasModuleItem, HasName, HasVisibility};
-use ra_ap_syntax::{AstNode, Edition, SyntaxKind, SyntaxToken, TextRange, ast};
+use ra_ap_syntax::{
+    AstNode, Edition, SyntaxKind, SyntaxToken, TextRange, ast,
+    ast::{HasAttrs, HasModuleItem, HasName, HasVisibility},
+};
 
 use crate::organize::{
     imports::{ImportBinding, ImportKind, ImportTree, identifier_name},
@@ -575,15 +577,8 @@ fn merge_imports(declarations: Vec<Declaration>) -> Vec<Declaration> {
         let imports_root = bindings
             .iter()
             .any(|binding| binding.kind == ImportKind::Normal && binding.path == key.root);
-        let incompatible = comparison_keys.windows(2).any(|pair| {
-            let left = &pair[0];
-            let right = &pair[1];
-            left == right
-                || (left.1 == ImportKind::Normal
-                    && right.0.starts_with(&left.0)
-                    && (left.0 != right.0 || right.1 != ImportKind::Normal))
-        });
-        if imports_root || incompatible {
+        let duplicate = comparison_keys.windows(2).any(|pair| pair[0] == pair[1]);
+        if imports_root || duplicate {
             output.extend(candidate);
             continue;
         }

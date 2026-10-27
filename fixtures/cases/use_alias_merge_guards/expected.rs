@@ -16,9 +16,7 @@ use foo::{self as Same, Z as Last};
 
 fn equivalent_self_duplicate() {}
 
-use foo::Z;
-use foo::a as ModuleAlias;
-use foo::a::Child as ChildAlias;
+use foo::{Z, a as ModuleAlias, a::Child as ChildAlias};
 
 fn ordinary_leaf_and_child() {}
 
@@ -27,8 +25,10 @@ use foo::Z;
 
 fn ordinary_root_and_child() {}
 
-use foo::a as Both;
-use foo::a::{self as TypeOnly, A, Z};
+use foo::{
+    a as Both,
+    a::{self as TypeOnly, A, Z},
+};
 
 fn normal_and_self_at_same_path() {}
 
