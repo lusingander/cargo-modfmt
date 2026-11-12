@@ -32,7 +32,10 @@ enum CargoCommand {
 }
 
 #[derive(clap::Args)]
-#[command(about = "Sort external mod and supported use declarations in Rust source")]
+#[command(
+    version,
+    about = "Sort external mod and supported use declarations in Rust source"
+)]
 struct Args {
     /// Rust edition used to parse the input (2015, 2018, 2021, or 2024).
     #[arg(long, global = true, value_name = "EDITION")]
